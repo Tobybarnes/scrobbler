@@ -48,6 +48,15 @@ class MusicPoller {
         }
     }
 
+    // MARK: - Helpers
+
+    private static func parseDouble(_ string: String) -> Double? {
+        // AppleScript may return a comma decimal separator on non-English locales.
+        // Normalise to a period before parsing.
+        let normalised = string.replacingOccurrences(of: ",", with: ".")
+        return Double(normalised)
+    }
+
     // MARK: - AppleScript
 
     private static let appleScript = """
@@ -95,8 +104,8 @@ class MusicPoller {
                               duration: 0, position: 0, playerState: .stopped)
         }
 
-        guard let duration = Double(lines[3]),
-              let position = Double(lines[4]) else { return nil }
+        guard let duration = parseDouble(lines[3]),
+              let position = parseDouble(lines[4]) else { return nil }
 
         return TrackState(
             track: lines[0],
