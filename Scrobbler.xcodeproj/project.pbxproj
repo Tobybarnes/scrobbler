@@ -1,0 +1,257 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		20060301A326C58E2BAEC4A8 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52ACB0A3B55F9AE6DA8C1085 /* AppDelegate.swift */; };
+		9BA8D1DA5F2F7488A60706DF /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 468A3BB2E421C5DADEC519D7 /* main.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		33D8EF010668B8A05B5B397E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 07642746765AC2DE19177850 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D2E8974522596B4E7CBB652B;
+			remoteInfo = Scrobbler;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		468A3BB2E421C5DADEC519D7 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		51F860A0CE3B06A0096865C1 /* Scrobbler.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Scrobbler.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		52ACB0A3B55F9AE6DA8C1085 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		5E0F2520B3181AAB30874921 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B646365CE261DCA9912C6A39 /* ScrobblerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ScrobblerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		52AFFEE419A70D86F459B6C6 /* ScrobblerTests */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = ScrobblerTests;
+			sourceTree = "<group>";
+		};
+		6097F745FEF8A869AC5B0F3D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				51F860A0CE3B06A0096865C1 /* Scrobbler.app */,
+				B646365CE261DCA9912C6A39 /* ScrobblerTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		78E7C964FF398060401888E6 /* Scrobbler */ = {
+			isa = PBXGroup;
+			children = (
+				52ACB0A3B55F9AE6DA8C1085 /* AppDelegate.swift */,
+				5E0F2520B3181AAB30874921 /* Info.plist */,
+				468A3BB2E421C5DADEC519D7 /* main.swift */,
+			);
+			path = Scrobbler;
+			sourceTree = "<group>";
+		};
+		C4745CC688C10A90AC53627C = {
+			isa = PBXGroup;
+			children = (
+				78E7C964FF398060401888E6 /* Scrobbler */,
+				52AFFEE419A70D86F459B6C6 /* ScrobblerTests */,
+				6097F745FEF8A869AC5B0F3D /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		556C09990AB4208C21917353 /* ScrobblerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 10B76EA42140B91A3AB2834B /* Build configuration list for PBXNativeTarget "ScrobblerTests" */;
+			buildPhases = (
+				14B2359173AC3FE1D5FD2CD5 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				17465050D2C5FA9FDEB2F219 /* PBXTargetDependency */,
+			);
+			name = ScrobblerTests;
+			productName = ScrobblerTests;
+			productReference = B646365CE261DCA9912C6A39 /* ScrobblerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		D2E8974522596B4E7CBB652B /* Scrobbler */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9AE9CFEDC4B9962646D9876F /* Build configuration list for PBXNativeTarget "Scrobbler" */;
+			buildPhases = (
+				AFB754208F8811A3953450E6 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Scrobbler;
+			productName = Scrobbler;
+			productReference = 51F860A0CE3B06A0096865C1 /* Scrobbler.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		07642746765AC2DE19177850 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					D2E8974522596B4E7CBB652B = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 54819823BDDC680796F21D60 /* Build configuration list for PBXProject "Scrobbler" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = C4745CC688C10A90AC53627C;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D2E8974522596B4E7CBB652B /* Scrobbler */,
+				556C09990AB4208C21917353 /* ScrobblerTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		14B2359173AC3FE1D5FD2CD5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AFB754208F8811A3953450E6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				20060301A326C58E2BAEC4A8 /* AppDelegate.swift in Sources */,
+				9BA8D1DA5F2F7488A60706DF /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		17465050D2C5FA9FDEB2F219 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D2E8974522596B4E7CBB652B /* Scrobbler */;
+			targetProxy = 33D8EF010668B8A05B5B397E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1DE78DF76638807C7C6EA74F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = Scrobbler/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tobybarnes.scrobbler;
+				PRODUCT_NAME = Scrobbler;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		3D8198FB43863F558E5F7548 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tobybarnes.ScrobblerTests;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Scrobbler.app/Contents/MacOS/Scrobbler";
+			};
+			name = Debug;
+		};
+		3FDA941B06CED70A08D1D8AA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = Scrobbler/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tobybarnes.scrobbler;
+				PRODUCT_NAME = Scrobbler;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		415A9C606090F1E0969AACBB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		6F393D58FCF5351F9D60451A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		CACEB4F8EDFFEA2F846334CF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tobybarnes.ScrobblerTests;
+				SWIFT_VERSION = 5.9;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Scrobbler.app/Contents/MacOS/Scrobbler";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		10B76EA42140B91A3AB2834B /* Build configuration list for PBXNativeTarget "ScrobblerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3D8198FB43863F558E5F7548 /* Debug */,
+				CACEB4F8EDFFEA2F846334CF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		54819823BDDC680796F21D60 /* Build configuration list for PBXProject "Scrobbler" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				415A9C606090F1E0969AACBB /* Debug */,
+				6F393D58FCF5351F9D60451A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9AE9CFEDC4B9962646D9876F /* Build configuration list for PBXNativeTarget "Scrobbler" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3FDA941B06CED70A08D1D8AA /* Debug */,
+				1DE78DF76638807C7C6EA74F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 07642746765AC2DE19177850 /* Project object */;
+}

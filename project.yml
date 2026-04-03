@@ -1,0 +1,32 @@
+name: Scrobbler
+options:
+  bundleIdPrefix: com.tobybarnes
+  deploymentTarget:
+    macOS: "13.0"
+  defaultConfig: Debug
+targets:
+  Scrobbler:
+    type: application
+    platform: macOS
+    sources:
+      - path: Scrobbler
+    settings:
+      base:
+        PRODUCT_NAME: Scrobbler
+        PRODUCT_BUNDLE_IDENTIFIER: com.tobybarnes.scrobbler
+        INFOPLIST_FILE: Scrobbler/Info.plist
+        SWIFT_VERSION: "5.9"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
+  ScrobblerTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: ScrobblerTests
+    dependencies:
+      - target: Scrobbler
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
