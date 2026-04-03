@@ -99,13 +99,101 @@ class LastFMClient {
         ])
     }
 
-    // MARK: - Stubs (replaced by Task 5 extension)
+}
 
-    func post(params: [String: String]) async throws -> [String: Any] {
-        throw LastFMError.invalidResponse
+// MARK: - Network calls
+
+extension LastFMClient {
+
+    // MARK: GET / POST helpers
+    // `fileprivate` (not `private`) so the class-body methods (updateNowPlaying,
+    // scrobble, love) in the same file can call these helpers.
+
+    fileprivate func get(params: [String: String]) async throws -> Data {
+        var components = URLComponents(url: Self.baseURL, resolvingAgainstBaseURL: false)!
+        var queryItems = params.map { URLQueryItem(name: $0.key, value: $0.value) }
+        queryItems.append(URLQueryItem(name: "format", value: "json"))
+        components.queryItems = queryItems
+
+        var request = URLRequest(url: components.url!)
+        request.setValue("Scrobbler/1.0", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw LastFMError.invalidResponse }
+        guard http.statusCode == 200 else { throw LastFMError.httpError(http.statusCode) }
+        try checkForAPIError(data)
+        return data
     }
 
-    func get(params: [String: String]) async throws -> [String: Any] {
-        throw LastFMError.invalidResponse
+    fileprivate func post(params: [String: String]) async throws -> Data {
+        var allParams = params
+        allParams["format"] = "json"
+        let sig = Self.apiSignature(params: params, secret: Self.secret)
+        allParams["api_sig"] = sig
+
+        var request = URLRequest(url: Self.baseURL)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.setValue("Scrobbler/1.0", forHTTPHeaderField: "User-Agent")
+        request.httpBody = allParams
+            .map { "\($0.key.urlEncoded)=\($0.value.urlEncoded)" }
+            .joined(separator: "&")
+            .data(using: .utf8)
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw LastFMError.invalidResponse }
+        guard http.statusCode == 200 else { throw LastFMError.httpError(http.statusCode) }
+        try checkForAPIError(data)
+        return data
+    }
+
+    private func checkForAPIError(_ data: Data) throws {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let code = json["error"] as? Int else { return }
+        let message = json["message"] as? String ?? "Unknown error"
+        throw LastFMError.apiError(code, message)
+    }
+
+    // MARK: Auth
+
+    func getToken() async throws -> String {
+        let data = try await get(params: [
+            "method": "auth.getToken",
+            "api_key": Self.apiKey
+        ])
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let token = json["token"] as? String else {
+            throw LastFMError.invalidResponse
+        }
+        return token
+    }
+
+    func getSession(token: String) async throws -> String {
+        let params: [String: String] = [
+            "method": "auth.getSession",
+            "api_key": Self.apiKey,
+            "token": token
+        ]
+        let sig = Self.apiSignature(params: params, secret: Self.secret)
+        let data = try await get(params: params.merging(["api_sig": sig]) { $1 })
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let session = json["session"] as? [String: Any],
+              let key = session["key"] as? String else {
+            throw LastFMError.invalidResponse
+        }
+        return key
+    }
+}
+
+// MARK: - URL encoding helper
+// For application/x-www-form-urlencoded bodies, only unreserved characters
+// (A-Z a-z 0-9 - . _ ~) may appear unencoded. Everything else — including
+// &, =, + and spaces — must be percent-encoded.
+
+private extension String {
+    var urlEncoded: String {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        return addingPercentEncoding(withAllowedCharacters: allowed) ?? self
     }
 }
