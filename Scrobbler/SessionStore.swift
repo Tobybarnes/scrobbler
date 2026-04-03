@@ -4,6 +4,7 @@ import Security
 enum SessionStoreError: Error {
     case saveFailed(OSStatus)
     case deleteFailed(OSStatus)
+    case encodingFailed
 }
 
 class SessionStore {
@@ -17,7 +18,9 @@ class SessionStore {
     }
 
     func save(_ sessionKey: String) throws {
-        guard let data = sessionKey.data(using: .utf8) else { return }
+        guard let data = sessionKey.data(using: .utf8) else {
+            throw SessionStoreError.encodingFailed
+        }
 
         // Delete any existing entry first (update is fiddly, delete+add is reliable)
         try? delete()
