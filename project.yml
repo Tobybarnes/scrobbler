@@ -4,6 +4,15 @@ options:
   deploymentTarget:
     macOS: "13.0"
   defaultConfig: Debug
+schemes:
+  Scrobbler:
+    build:
+      targets:
+        Scrobbler: all
+        ScrobblerTests: [test]
+    test:
+      targets:
+        - ScrobblerTests
 targets:
   Scrobbler:
     type: application
@@ -16,9 +25,11 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.tobybarnes.scrobbler
         INFOPLIST_FILE: Scrobbler/Info.plist
         SWIFT_VERSION: "5.9"
-        CODE_SIGN_STYLE: Automatic
-        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: NO
         MACOSX_DEPLOYMENT_TARGET: "13.0"
+        ENABLE_TESTABILITY: YES
   ScrobblerTests:
     type: bundle.unit-test
     platform: macOS
@@ -28,5 +39,12 @@ targets:
       - target: Scrobbler
     settings:
       base:
+        PRODUCT_NAME: ScrobblerTests
+        PRODUCT_BUNDLE_IDENTIFIER: com.tobybarnes.scrobbler.tests
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "13.0"
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Scrobbler.app/Contents/MacOS/Scrobbler"
