@@ -40,8 +40,8 @@ extension URLSession: URLSessionProtocol {}
 // MARK: - LastFMClient
 
 class LastFMClient {
-    static let apiKey = "c921ad1bc9f787ba5cc78fe927316420"
-    static let secret = "48be52a4d433f832cf9b10ae0e0e501e"
+    static let apiKey = Secrets.apiKey
+    static let secret = Secrets.secret
     static let baseURL = URL(string: "https://ws.audioscrobbler.com/2.0/")!
 
     let session: URLSessionProtocol
