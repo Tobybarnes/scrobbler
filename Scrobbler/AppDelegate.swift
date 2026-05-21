@@ -63,7 +63,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             } else if !appState.isScrobblingEnabled {
                 dotColor = .secondaryLabelColor
             } else if appState.currentTrack?.playerState == .playing {
-                dotColor = .systemRed
+                dotColor = .systemGreen
             } else {
                 dotColor = nil
             }

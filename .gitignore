@@ -1,2 +1,9 @@
 .DS_Store
 Scrobbler/Secrets.swift
+
+# Xcode per-user state
+Scrobbler.xcodeproj/project.xcworkspace/xcuserdata/
+Scrobbler.xcodeproj/xcuserdata/
+
+# Local agent tooling
+.superpowers/

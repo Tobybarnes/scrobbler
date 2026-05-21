@@ -48,6 +48,10 @@ class MenuController {
         }
 
         menu.addItem(NSMenuItem.separator())
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let versionItem = NSMenuItem(title: "Scrobbler \(version)", action: nil, keyEquivalent: "")
+        versionItem.isEnabled = false
+        menu.addItem(versionItem)
         menu.addItem(makeItem("Quit", action: #selector(quitTapped), target: self))
         return menu
     }
