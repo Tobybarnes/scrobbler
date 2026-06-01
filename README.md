@@ -21,24 +21,21 @@ wrong with auth or the API.
 * macOS 13 or later
 * Apple Music (the desktop app, not just the web player)
 * A Last.fm account
-* A Last.fm API key and shared secret (free, [apply here](https://www.last.fm/api/account/create))
 * Xcode 15 with Swift 5.9
 * [XcodeGen](https://github.com/yonaskolb/XcodeGen) to generate the project from `project.yml`
 
 ## Build and run
 
-Clone the repo, copy the secrets template into place, fill in your own Last.fm
-API credentials, then generate and open the Xcode project:
+Clone the repo, generate the Xcode project, then open it:
 
 ```bash
-cp Secrets.example.swift Scrobbler/Secrets.swift
-# edit Scrobbler/Secrets.swift and paste in your apiKey and secret
 xcodegen generate
 open Scrobbler.xcodeproj
 ```
 
-`Scrobbler/Secrets.swift` is gitignored, so your keys never end up in version
-control. The build will fail until that file exists.
+The repo is private and includes `Scrobbler/Secrets.swift` with the Last.fm API
+credentials for this personal app, so a fresh clone has everything needed to
+compile.
 
 Build the `Scrobbler` scheme. The app launches with no Dock icon, just a
 menu bar entry.
@@ -63,6 +60,8 @@ Five files, one job each.
   `auth.getSession`, `track.updateNowPlaying`, `track.scrobble`, `track.love`)
 * `SessionStore` reads and writes the session key to the Keychain
 * `AppDelegate` wires everything together and owns the `NSStatusItem`
+* `Secrets` contains the Last.fm API key and shared secret used by
+  `LastFMClient`
 
 `MenuController` builds the menu from an `AppState` value. The UI never
 drives logic, it only reflects state.
@@ -84,6 +83,11 @@ Acceptable trade off for a personal tool. Pausing scrobbling discards
 accumulated time on the current track too, rather than trying to do partial
 play accounting.
 
+The checked-in project uses local/ad-hoc signing for easy rebuilds from source.
+That is fine when running from Xcode. A standalone `.app` copied between Macs
+will still run into Gatekeeper/Santa policy unless it is built locally on that
+Mac or signed/notarized with a Developer ID.
+
 ## Why this exists
 
 Last.fm has a Mac client called Last.app, but it crashes for me regularly
@@ -92,4 +96,4 @@ small and reliable that I could read in an afternoon.
 
 ## Licence
 
-MIT. Use it, fork it, swap the API key in, scrobble away.
+MIT.

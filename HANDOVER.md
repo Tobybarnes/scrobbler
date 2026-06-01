@@ -16,17 +16,14 @@ You need all of these before you can build:
 
 1. **Xcode 15 or later.** Install from Self Service or the App Store. This takes a while, run it first.
 2. **XcodeGen.** Install with `brew install xcodegen`. The Xcode project file is generated from `project.yml`, not checked in as the source of truth.
-3. **A Last.fm API key and shared secret.** These are the two values that go into `Scrobbler/Secrets.swift`. That file is gitignored, so it is not in the repo. Toby will provide the two strings out of band (Bitwarden or similar). If for any reason he doesn't, the keys can be retrieved or regenerated at https://www.last.fm/api/accounts.
+
+The repo is private and includes `Scrobbler/Secrets.swift`, so there is no separate Last.fm credential handoff.
 
 ## Build steps
 
 ```bash
 git clone https://github.com/Tobybarnes/scrobbler.git
 cd scrobbler
-
-# Create the secrets file from the template, then paste the real values in
-cp Secrets.example.swift Scrobbler/Secrets.swift
-# Edit Scrobbler/Secrets.swift, fill in apiKey and secret
 
 # Generate the Xcode project
 xcodegen generate
@@ -35,11 +32,11 @@ xcodegen generate
 open Scrobbler.xcodeproj
 ```
 
-In Xcode, build the `Scrobbler` scheme. The build will fail without `Scrobbler/Secrets.swift` in place, so make sure that step actually happened.
+In Xcode, build the `Scrobbler` scheme. A fresh clone should already contain the app icon, project config, tests, and Last.fm credentials needed to compile.
 
 ## First launch
 
-The app uses ad-hoc signing (`CODE_SIGN_IDENTITY: "-"` in `project.yml`). Locally-built debug runs from Xcode are normally fine on a Shopify-managed Mac because Xcode handles signing for the launching user. If you hit a Santa block at first launch, request an allowlist exception via Self Service. Mention it's a locally-built personal menu bar tool.
+The app uses local/ad-hoc signing (`CODE_SIGN_IDENTITY: "-"` in `project.yml`). Locally-built debug runs from Xcode are normally fine on a Shopify-managed Mac because Xcode handles signing for the launching user. If you hit a Santa block at first launch, request an allowlist exception via Self Service. Mention it's a locally-built personal menu bar tool.
 
 Once the app launches, it appears in the menu bar with no Dock icon. The first time, the menu reads "Not connected". The flow is:
 
@@ -53,8 +50,7 @@ The Last.fm session key is stored in the macOS Keychain under service `com.tobyb
 ## What not to do
 
 - Do **not** try to copy the compiled `.app` from the old machine. That's what was blocked. Build locally instead.
-- Do **not** commit `Scrobbler/Secrets.swift`. It is gitignored for a reason.
-- Do **not** check in `xcuserdata/` or `.superpowers/`. Both are gitignored as of this handover.
+- Do **not** check in generated `build/`, `DerivedData/`, `xcuserdata/`, or `.superpowers/`.
 - Do **not** flip `ENABLE_HARDENED_RUNTIME` to `YES` or change `CODE_SIGN_IDENTITY` away from `-` unless you actually have a Developer ID set up. The current config is intentionally permissive because this is a personal local build.
 
 ## File map
@@ -64,9 +60,10 @@ The Last.fm session key is stored in the macOS Keychain under service `com.tobyb
 - `Scrobbler/MenuController.swift` — builds the dropdown menu from app state
 - `Scrobbler/ScrobbleEngine.swift` — playback accumulation and scrobble rules
 - `Scrobbler/LastFMClient.swift` — Last.fm API calls
+- `Scrobbler/Secrets.swift` — Last.fm API key and shared secret for this private repo
 - `Scrobbler/SessionStore.swift` — Keychain read/write for the session key
 - `Scrobbler/MusicPoller.swift` — polls Apple Music every 5 seconds
-- `Secrets.example.swift` — template for `Scrobbler/Secrets.swift`
+- `Secrets.example.swift` — optional template if you ever want to rotate to a different Last.fm API app
 - `Scrobbler/Assets.xcassets/` — app icon
 
 ## Verification

@@ -1,5 +1,6 @@
 .DS_Store
-Scrobbler/Secrets.swift
+build/
+DerivedData/
 
 # Xcode per-user state
 Scrobbler.xcodeproj/project.xcworkspace/xcuserdata/
