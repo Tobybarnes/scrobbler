@@ -24,11 +24,9 @@ jobs:
       - name: Set release version
         env:
           RELEASE_VERSION: ${{ github.ref_name }}
-          BUILD_NUMBER: ${{ github.run_number }}
         run: |
           RELEASE_VERSION="${RELEASE_VERSION#v}"
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $RELEASE_VERSION" Scrobbler/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" Scrobbler/Info.plist
 
       - name: Build app
         run: |
@@ -36,8 +34,7 @@ jobs:
             -scheme Scrobbler \
             -configuration Release \
             -destination 'platform=macOS' \
-            -derivedDataPath build/DerivedData \
-            CODE_SIGNING_ALLOWED=NO
+            -derivedDataPath build/DerivedData
 
       - name: Package app
         run: |
