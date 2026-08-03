@@ -83,9 +83,9 @@ class MenuController {
             trackItem.attributedTitle = menuText(trackItem.title, bold: true)
             menu.addItem(trackItem)
 
-            let metaItem = NSMenuItem(title: "  \(track.artist) · \(track.album)", action: nil, keyEquivalent: "")
-            metaItem.attributedTitle = menuText(metaItem.title)
-            menu.addItem(metaItem)
+            let artistItem = NSMenuItem(title: "  \(track.artist)", action: nil, keyEquivalent: "")
+            artistItem.attributedTitle = menuText(artistItem.title, bold: true)
+            menu.addItem(artistItem)
         } else {
             let nothingItem = NSMenuItem(title: "Not playing", action: nil, keyEquivalent: "")
             nothingItem.isEnabled = false
