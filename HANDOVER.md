@@ -17,7 +17,9 @@ You need all of these before you can build:
 1. **Xcode 15 or later.** Install from Self Service or the App Store. This takes a while, run it first.
 2. **XcodeGen.** Install with `brew install xcodegen`. The Xcode project file is generated from `project.yml`, not checked in as the source of truth.
 
-The repo is private and includes `Scrobbler/Secrets.swift`, so there is no separate Last.fm credential handoff.
+Last.fm credentials are entered on first launch and stored in the macOS
+Keychain. They are not part of the repository. On a new Mac, choose “Set up
+Last.fm credentials…” from the menu and enter the API key and shared secret.
 
 ## Build steps
 
@@ -60,7 +62,7 @@ The Last.fm session key is stored in the macOS Keychain under service `com.tobyb
 - `Scrobbler/MenuController.swift` — builds the dropdown menu from app state
 - `Scrobbler/ScrobbleEngine.swift` — playback accumulation and scrobble rules
 - `Scrobbler/LastFMClient.swift` — Last.fm API calls
-- `Scrobbler/Secrets.swift` — Last.fm API key and shared secret for this private repo
+- `Scrobbler/CredentialStore.swift` — stores Last.fm credentials in Keychain
 - `Scrobbler/SessionStore.swift` — Keychain read/write for the session key
 - `Scrobbler/MusicPoller.swift` — polls Apple Music every 5 seconds
 - `Secrets.example.swift` — optional template if you ever want to rotate to a different Last.fm API app

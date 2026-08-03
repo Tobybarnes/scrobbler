@@ -33,9 +33,9 @@ xcodegen generate
 open Scrobbler.xcodeproj
 ```
 
-The repo is private and includes `Scrobbler/Secrets.swift` with the Last.fm API
-credentials for this personal app, so a fresh clone has everything needed to
-compile.
+Last.fm credentials are entered on first launch and stored in the macOS
+Keychain. They are never included in the repository. A fresh clone can be
+configured on any Mac by choosing “Set up Last.fm credentials…”.
 
 Build the `Scrobbler` scheme. The app launches with no Dock icon, just a
 menu bar entry.
@@ -60,8 +60,7 @@ Five files, one job each.
   `auth.getSession`, `track.updateNowPlaying`, `track.scrobble`, `track.love`)
 * `SessionStore` reads and writes the session key to the Keychain
 * `AppDelegate` wires everything together and owns the `NSStatusItem`
-* `Secrets` contains the Last.fm API key and shared secret used by
-  `LastFMClient`
+* `CredentialStore` keeps the Last.fm API key and shared secret in Keychain
 
 `MenuController` builds the menu from an `AppState` value. The UI never
 drives logic, it only reflects state.
