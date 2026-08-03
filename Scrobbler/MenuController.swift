@@ -78,14 +78,14 @@ class MenuController {
         menu.addItem(nowPlayingHeader)
 
         if let track = state.currentTrack, track.playerState == .playing {
+            let artistItem = NSMenuItem(title: track.artist, action: nil, keyEquivalent: "")
+            artistItem.attributedTitle = menuText(artistItem.title, bold: true)
+            menu.addItem(artistItem)
+
             let dot = state.isScrobblingEnabled ? "● " : ""
             let trackItem = NSMenuItem(title: "\(dot)\(track.track)", action: nil, keyEquivalent: "")
             trackItem.attributedTitle = menuText(trackItem.title, bold: true)
             menu.addItem(trackItem)
-
-            let artistItem = NSMenuItem(title: "  \(track.artist)", action: nil, keyEquivalent: "")
-            artistItem.attributedTitle = menuText(artistItem.title, bold: true)
-            menu.addItem(artistItem)
         } else {
             let nothingItem = NSMenuItem(title: "Not playing", action: nil, keyEquivalent: "")
             nothingItem.isEnabled = false
