@@ -26,7 +26,10 @@ class LastFMClientTests: XCTestCase {
     override func setUp() {
         super.setUp()
         mock = MockURLSession()
-        client = LastFMClient(session: mock)
+        client = LastFMClient(
+            credentials: LastFMCredentials(apiKey: "test-api-key", sharedSecret: "test-shared-secret"),
+            session: mock
+        )
     }
 
     func test_getToken_returns_token_on_success() async throws {

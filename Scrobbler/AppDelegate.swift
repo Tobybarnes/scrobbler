@@ -8,7 +8,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let sessionStore = SessionStore()
     private let credentialStore = CredentialStore()
-    private let lastFMClient = LastFMClient()
+    private let lastFMClient = LastFMClient(credentials: nil)
     private let updateService = UpdateService()
     private var scrobbleEngine: ScrobbleEngine?
     private let poller = MusicPoller()
@@ -38,19 +38,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Status item setup
 
     private func setupStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem.autosaveName = "scrobbler.status"
+        if let button = statusItem.button {
+            let image = NSImage(systemSymbolName: "music.note", accessibilityDescription: "Scrobbler")
+            image?.isTemplate = true
+            button.image = image
+            button.imagePosition = .imageOnly
+        }
         updateStatusItemTitle()
         statusItem.menu = menuController.buildMenu(for: appState)
     }
 
     private func updateStatusItemTitle() {
         let title: String
-        let dotColor: NSColor?
 
         switch appState.auth {
         case .notAuthenticated, .pendingApproval:
             title = "♫ Not connected"
-            dotColor = .systemOrange
 
         case .authenticated:
             if let track = appState.currentTrack, track.playerState == .playing {
@@ -60,23 +65,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             } else {
                 title = "♫ Not playing"
             }
-            if appState.hasAPIError {
-                dotColor = .systemOrange
-            } else if !appState.isScrobblingEnabled {
-                dotColor = .secondaryLabelColor
-            } else if appState.currentTrack?.playerState == .playing {
-                dotColor = .systemGreen
-            } else {
-                dotColor = nil
-            }
         }
 
-        let attributed = NSMutableAttributedString(string: title)
-        if let color = dotColor {
-            let dot = NSAttributedString(string: " ●", attributes: [.foregroundColor: color])
-            attributed.append(dot)
-        }
-        statusItem.button?.attributedTitle = attributed
+        statusItem.button?.attributedTitle = NSAttributedString(string: "")
+        statusItem.button?.toolTip = title
+        statusItem.button?.contentTintColor = nil
     }
 
     private func rebuildMenu() {
@@ -87,11 +80,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Auth
 
     private func checkAuthAndStart() {
-        if let key = sessionStore.load() {
-            appState.auth = .authenticated
-            startPolling(sessionKey: key)
-        } else {
-            appState.auth = .notAuthenticated
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let credentials = CredentialStore().load()
+            let sessionKey = SessionStore().load()
+
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.lastFMClient.credentials = credentials
+                if credentials != nil, let sessionKey {
+                    self.appState.auth = .authenticated
+                    self.startPolling(sessionKey: sessionKey)
+                } else {
+                    self.appState.auth = .notAuthenticated
+                }
+            }
         }
     }
 

@@ -31,6 +31,7 @@ class MenuController {
     func buildMenu(for state: AppState) -> NSMenu {
         self.state = state
         let menu = NSMenu()
+        menu.autoenablesItems = false
 
         switch state.auth {
         case .notAuthenticated:
@@ -79,12 +80,10 @@ class MenuController {
         if let track = state.currentTrack, track.playerState == .playing {
             let dot = state.isScrobblingEnabled ? "● " : ""
             let trackItem = NSMenuItem(title: "\(dot)\(track.track)", action: nil, keyEquivalent: "")
-            trackItem.isEnabled = false
             trackItem.attributedTitle = menuText(trackItem.title, bold: true)
             menu.addItem(trackItem)
 
             let metaItem = NSMenuItem(title: "  \(track.artist) · \(track.album)", action: nil, keyEquivalent: "")
-            metaItem.isEnabled = false
             metaItem.attributedTitle = menuText(metaItem.title)
             menu.addItem(metaItem)
         } else {
