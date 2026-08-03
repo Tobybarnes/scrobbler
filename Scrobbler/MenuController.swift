@@ -18,6 +18,8 @@ struct AppState {
 class MenuController {
     // Called by AppDelegate when menu items are tapped
     var onConnect: (() -> Void)?
+    var onConfigureCredentials: (() -> Void)?
+    var onCheckForUpdates: (() -> Void)?
     var onApproved: ((String) -> Void)?      // passes the pending token
     var onPauseResume: (() -> Void)?
     var onLove: (() -> Void)?
@@ -35,6 +37,8 @@ class MenuController {
             menu.addItem(withTitle: "Not connected to Last.fm", action: nil, keyEquivalent: "")
                 .isEnabled = false
             menu.addItem(NSMenuItem.separator())
+            menu.addItem(makeItem("Set up Last.fm credentials…", action: #selector(configureCredentialsTapped), target: self))
+            menu.addItem(NSMenuItem.separator())
             menu.addItem(makeItem("Connect to Last.fm", action: #selector(connectTapped), target: self))
 
         case .pendingApproval(let token):
@@ -48,6 +52,7 @@ class MenuController {
         }
 
         menu.addItem(NSMenuItem.separator())
+        menu.addItem(makeItem("Check for Updates…", action: #selector(checkForUpdatesTapped), target: self))
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         let versionItem = NSMenuItem(title: "Scrobbler \(version)", action: nil, keyEquivalent: "")
         versionItem.isEnabled = false
@@ -75,10 +80,12 @@ class MenuController {
             let dot = state.isScrobblingEnabled ? "● " : ""
             let trackItem = NSMenuItem(title: "\(dot)\(track.track)", action: nil, keyEquivalent: "")
             trackItem.isEnabled = false
+            trackItem.attributedTitle = menuText(trackItem.title, bold: true)
             menu.addItem(trackItem)
 
             let metaItem = NSMenuItem(title: "  \(track.artist) · \(track.album)", action: nil, keyEquivalent: "")
             metaItem.isEnabled = false
+            metaItem.attributedTitle = menuText(metaItem.title)
             menu.addItem(metaItem)
         } else {
             let nothingItem = NSMenuItem(title: "Not playing", action: nil, keyEquivalent: "")
@@ -112,12 +119,15 @@ class MenuController {
         menu.addItem(makeItem(pauseTitle, action: #selector(pauseResumeTapped), target: self))
 
         menu.addItem(NSMenuItem.separator())
+        menu.addItem(makeItem("Change Last.fm credentials…", action: #selector(configureCredentialsTapped), target: self))
         menu.addItem(makeItem("Disconnect from Last.fm", action: #selector(disconnectTapped), target: self))
     }
 
     // MARK: - Actions
 
     @objc private func connectTapped()           { onConnect?() }
+    @objc private func configureCredentialsTapped() { onConfigureCredentials?() }
+    @objc private func checkForUpdatesTapped() { onCheckForUpdates?() }
     @objc private func approvedTapped(_ sender: NSMenuItem) {
         onApproved?(sender.representedObject as? String ?? "")
     }
@@ -138,6 +148,13 @@ class MenuController {
         NSAttributedString(string: text, attributes: [
             .font: NSFont.systemFont(ofSize: 10, weight: .semibold),
             .foregroundColor: NSColor.secondaryLabelColor
+        ])
+    }
+
+    private func menuText(_ text: String, bold: Bool = false) -> NSAttributedString {
+        NSAttributedString(string: text, attributes: [
+            .foregroundColor: NSColor.labelColor,
+            .font: bold ? NSFont.boldSystemFont(ofSize: NSFont.systemFontSize) : NSFont.systemFont(ofSize: NSFont.systemFontSize)
         ])
     }
 }

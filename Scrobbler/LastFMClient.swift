@@ -14,6 +14,7 @@ extension String {
 // MARK: - Error model
 
 enum LastFMError: Error, LocalizedError {
+    case missingCredentials
     case network(Error)
     case httpError(Int)
     case apiError(Int, String)
@@ -21,6 +22,7 @@ enum LastFMError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .missingCredentials: return "Last.fm credentials have not been configured."
         case .network(let e): return "Network error: \(e.localizedDescription)"
         case .httpError(let code): return "HTTP error \(code)"
         case .apiError(let code, let msg): return "Last.fm error \(code): \(msg)"
@@ -40,13 +42,14 @@ extension URLSession: URLSessionProtocol {}
 // MARK: - LastFMClient
 
 class LastFMClient {
-    static let apiKey = Secrets.apiKey
-    static let secret = Secrets.secret
     static let baseURL = URL(string: "https://ws.audioscrobbler.com/2.0/")!
 
     let session: URLSessionProtocol
+    var credentials: LastFMCredentials?
 
-    init(session: URLSessionProtocol = URLSession.shared) {
+    init(credentials: LastFMCredentials? = CredentialStore().load(),
+         session: URLSessionProtocol = URLSession.shared) {
+        self.credentials = credentials
         self.session = session
     }
 
@@ -65,9 +68,10 @@ class LastFMClient {
 
     func updateNowPlaying(track: String, artist: String, album: String,
                           duration: Int, sessionKey: String) async throws {
+        guard let credentials else { throw LastFMError.missingCredentials }
         _ = try await post(params: [
             "method": "track.updateNowPlaying",
-            "api_key": Self.apiKey,
+            "api_key": credentials.apiKey,
             "sk": sessionKey,
             "track": track,
             "artist": artist,
@@ -78,9 +82,10 @@ class LastFMClient {
 
     func scrobble(track: String, artist: String, album: String,
                   timestamp: Date, sessionKey: String) async throws {
+        guard let credentials else { throw LastFMError.missingCredentials }
         _ = try await post(params: [
             "method": "track.scrobble",
-            "api_key": Self.apiKey,
+            "api_key": credentials.apiKey,
             "sk": sessionKey,
             "track[0]": track,
             "artist[0]": artist,
@@ -90,9 +95,10 @@ class LastFMClient {
     }
 
     func love(track: String, artist: String, sessionKey: String) async throws {
+        guard let credentials else { throw LastFMError.missingCredentials }
         _ = try await post(params: [
             "method": "track.love",
-            "api_key": Self.apiKey,
+            "api_key": credentials.apiKey,
             "sk": sessionKey,
             "track": track,
             "artist": artist
@@ -126,9 +132,10 @@ extension LastFMClient {
     }
 
     fileprivate func post(params: [String: String]) async throws -> Data {
+        guard let credentials else { throw LastFMError.missingCredentials }
         var allParams = params
         allParams["format"] = "json"
-        let sig = Self.apiSignature(params: params, secret: Self.secret)
+        let sig = Self.apiSignature(params: params, secret: credentials.sharedSecret)
         allParams["api_sig"] = sig
 
         var request = URLRequest(url: Self.baseURL)
@@ -157,9 +164,10 @@ extension LastFMClient {
     // MARK: Auth
 
     func getToken() async throws -> String {
+        guard let credentials else { throw LastFMError.missingCredentials }
         let data = try await get(params: [
             "method": "auth.getToken",
-            "api_key": Self.apiKey
+            "api_key": credentials.apiKey
         ])
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let token = json["token"] as? String else {
@@ -169,12 +177,13 @@ extension LastFMClient {
     }
 
     func getSession(token: String) async throws -> String {
+        guard let credentials else { throw LastFMError.missingCredentials }
         let params: [String: String] = [
             "method": "auth.getSession",
-            "api_key": Self.apiKey,
+            "api_key": credentials.apiKey,
             "token": token
         ]
-        let sig = Self.apiSignature(params: params, secret: Self.secret)
+        let sig = Self.apiSignature(params: params, secret: credentials.sharedSecret)
         let data = try await get(params: params.merging(["api_sig": sig]) { $1 })
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let session = json["session"] as? [String: Any],

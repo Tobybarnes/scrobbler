@@ -7,7 +7,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Components
 
     private let sessionStore = SessionStore()
+    private let credentialStore = CredentialStore()
     private let lastFMClient = LastFMClient()
+    private let updateService = UpdateService()
     private var scrobbleEngine: ScrobbleEngine?
     private let poller = MusicPoller()
     private let menuController = MenuController()
@@ -123,6 +125,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        menuController.onConfigureCredentials = { [weak self] in
+            self?.configureCredentials()
+        }
+
+        menuController.onCheckForUpdates = { [weak self] in
+            Task { @MainActor [weak self] in
+                await self?.checkForUpdates()
+            }
+        }
+
         menuController.onApproved = { [weak self] token in
             Task { @MainActor [weak self] in
                 await self?.handleApproved(token: token)
@@ -154,10 +166,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Auth flow
 
     private func handleConnect() async {
+        guard lastFMClient.credentials != nil || configureCredentials() else { return }
         do {
             let token = try await lastFMClient.getToken()
             appState.auth = .pendingApproval(token: token)
-            let urlString = "https://www.last.fm/api/auth/?api_key=\(LastFMClient.apiKey)&token=\(token)"
+            let urlString = "https://www.last.fm/api/auth/?api_key=\(lastFMClient.credentials!.apiKey)&token=\(token)"
             if let url = URL(string: urlString) {
                 NSWorkspace.shared.open(url)
             }
@@ -218,5 +231,69 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+
+    private func checkForUpdates() async {
+        do {
+            guard let release = try await updateService.checkForUpdate() else {
+                showAlert("You’re up to date", message: "Scrobbler \(updateService.currentVersion) is the latest available version.")
+                return
+            }
+
+            let confirmation = NSAlert()
+            confirmation.messageText = "Scrobbler update available"
+            confirmation.informativeText = "Install \(release.name) from GitHub? The app will restart when the update is installed."
+            confirmation.addButton(withTitle: "Install Update")
+            confirmation.addButton(withTitle: "Later")
+            guard confirmation.runModal() == .alertFirstButtonReturn else { return }
+
+            try await updateService.install(release)
+            NSWorkspace.shared.open(Bundle.main.bundleURL)
+            NSApplication.shared.terminate(nil)
+        } catch {
+            showAlert("Update failed", message: error.localizedDescription)
+        }
+    }
+
+    @discardableResult
+    private func configureCredentials() -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Last.fm credentials"
+        alert.informativeText = "Enter your Last.fm API key and shared secret. They are stored only in this Mac’s Keychain."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+
+        let apiKeyLabel = NSTextField(labelWithString: "API key")
+        let apiKeyField = NSTextField(string: lastFMClient.credentials?.apiKey ?? "")
+        apiKeyField.placeholderString = "Last.fm API key"
+        apiKeyField.translatesAutoresizingMaskIntoConstraints = false
+
+        let secretLabel = NSTextField(labelWithString: "Shared secret")
+        let secretField = NSSecureTextField(string: lastFMClient.credentials?.sharedSecret ?? "")
+        secretField.placeholderString = "Last.fm shared secret"
+        secretField.translatesAutoresizingMaskIntoConstraints = false
+
+        let fields = NSStackView(views: [apiKeyLabel, apiKeyField, secretLabel, secretField])
+        fields.orientation = .vertical
+        fields.alignment = .leading
+        fields.spacing = 6
+        fields.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            apiKeyField.widthAnchor.constraint(equalToConstant: 320),
+            secretField.widthAnchor.constraint(equalToConstant: 320)
+        ])
+        alert.accessoryView = fields
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return false }
+        do {
+            let credentials = LastFMCredentials(apiKey: apiKeyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
+                                                sharedSecret: secretField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+            try credentialStore.save(credentials)
+            lastFMClient.credentials = credentials
+            return true
+        } catch {
+            showAlert("Couldn’t save credentials", message: error.localizedDescription)
+            return false
+        }
     }
 }
