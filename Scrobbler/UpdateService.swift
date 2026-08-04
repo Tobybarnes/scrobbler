@@ -67,19 +67,38 @@ struct UpdateService {
     }
 
     var releasesURL: URL {
-        URL(string: "https://api.github.com/repos/\(Self.owner)/\(Self.repository)/releases/latest")!
+        URL(string: "https://github.com/\(Self.owner)/\(Self.repository)/releases/latest")!
     }
 
     func checkForUpdate() async throws -> GitHubRelease? {
         var request = URLRequest(url: releasesURL)
         request.setValue("Scrobbler/\(currentVersion)", forHTTPHeaderField: "User-Agent")
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
-        let (data, response) = try await session.data(for: request)
+        let (_, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw UpdateError.invalidResponse }
         guard http.statusCode == 200 else { throw UpdateError.httpError(http.statusCode) }
-
-        let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+        guard let finalURL = http.url,
+              let tagRange = finalURL.path.range(of: "/releases/tag/"),
+              let tagName = finalURL.path[tagRange.upperBound...].split(separator: "/").first.map(String.init),
+              !tagName.isEmpty else {
+            throw UpdateError.invalidResponse
+        }
+        let downloadBase = "https://github.com/\(Self.owner)/\(Self.repository)/releases/latest/download"
+        let release = GitHubRelease(
+            tagName: tagName,
+            name: tagName.lowercased().hasPrefix("v") ? String(tagName.dropFirst()) : tagName,
+            body: nil,
+            assets: [
+                GitHubReleaseAsset(
+                    name: Self.appAssetName,
+                    browserDownloadURL: URL(string: "\(downloadBase)/\(Self.appAssetName)")!
+                ),
+                GitHubReleaseAsset(
+                    name: Self.checksumAssetName,
+                    browserDownloadURL: URL(string: "\(downloadBase)/\(Self.checksumAssetName)")!
+                )
+            ]
+        )
         guard let releaseVersion = Self.version(from: release.tagName) else {
             throw UpdateError.invalidVersion(release.tagName)
         }

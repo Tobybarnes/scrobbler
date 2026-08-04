@@ -20,7 +20,52 @@ private final class SequencedURLSession: URLSessionProtocol {
     }
 }
 
+private final class PublicReleaseURLSession: URLSessionProtocol {
+    let latestReleaseURL = URL(string: "https://github.com/Tobybarnes/scrobbler/releases/tag/v1.2.4")!
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        if request.url?.host == "api.github.com" {
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 403,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (Data(), response)
+        }
+
+        let response = HTTPURLResponse(
+            url: latestReleaseURL,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+        return (Data(), response)
+    }
+}
+
 final class UpdateServiceTests: XCTestCase {
+    func testCheckForUpdateDoesNotDependOnRateLimitedGitHubAPI() async throws {
+        let service = UpdateService(
+            session: PublicReleaseURLSession(),
+            appURL: URL(fileURLWithPath: "/tmp/Scrobbler.app"),
+            currentVersion: "1.2.3"
+        )
+
+        let availableRelease = try await service.checkForUpdate()
+        let release = try XCTUnwrap(availableRelease)
+
+        XCTAssertEqual(release.tagName, "v1.2.4")
+        XCTAssertEqual(release.name, "1.2.4")
+        XCTAssertEqual(
+            release.assets.map(\.browserDownloadURL.absoluteString),
+            [
+                "https://github.com/Tobybarnes/scrobbler/releases/latest/download/Scrobbler.zip",
+                "https://github.com/Tobybarnes/scrobbler/releases/latest/download/Scrobbler.zip.sha256"
+            ]
+        )
+    }
+
     func testInstallAcceptsStandardSHA256Checksum() async throws {
         let archive = Data("abc".utf8)
         let checksum = Data("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  Scrobbler.zip\n".utf8)
