@@ -30,9 +30,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installMainMenu()
         setupStatusItem()
         setupMenuCallbacks()
         checkAuthAndStart()
+    }
+
+    // MARK: - Main menu
+
+    /// A menu bar (LSUIElement) app has no main menu by default, which means
+    /// Cmd+X/C/V/A and Undo don't work in any text field. Install a minimal
+    /// hidden menu so standard editing shortcuts reach the responder chain.
+    private func installMainMenu() {
+        let mainMenu = NSMenu()
+
+        let appItem = NSMenuItem()
+        let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "Quit Scrobbler", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appItem.submenu = appMenu
+        mainMenu.addItem(appItem)
+
+        let editItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = editMenu
+        mainMenu.addItem(editItem)
+
+        NSApplication.shared.mainMenu = mainMenu
+    }
+
+    /// Bring this background app to the front so a modal alert gets keyboard focus
+    /// instead of appearing behind (or typing into) whatever app was active.
+    private func runModalInFront(_ alert: NSAlert) -> NSApplication.ModalResponse {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        alert.window.level = .floating
+        return alert.runModal()
     }
 
     // MARK: - Status item setup
@@ -232,7 +271,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.informativeText = message
         alert.alertStyle = .warning
         alert.addButton(withTitle: "OK")
-        alert.runModal()
+        _ = runModalInFront(alert)
     }
 
     private func checkForUpdates() async {
@@ -247,7 +286,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             confirmation.informativeText = "Install \(release.name) from GitHub? The app will restart when the update is installed."
             confirmation.addButton(withTitle: "Install Update")
             confirmation.addButton(withTitle: "Later")
-            guard confirmation.runModal() == .alertFirstButtonReturn else { return }
+            guard runModalInFront(confirmation) == .alertFirstButtonReturn else { return }
 
             try await updateService.install(release)
             NSWorkspace.shared.open(Bundle.main.bundleURL)
@@ -279,14 +318,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         fields.orientation = .vertical
         fields.alignment = .leading
         fields.spacing = 6
-        fields.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             apiKeyField.widthAnchor.constraint(equalToConstant: 320),
             secretField.widthAnchor.constraint(equalToConstant: 320)
         ])
+        // NSAlert sizes its accessory view from the view's frame, not Auto Layout.
+        // Without an explicit frame the stack collapses to zero and the fields draw
+        // on top of each other, so give it its fitted size.
+        fields.layoutSubtreeIfNeeded()
+        fields.frame = NSRect(origin: .zero, size: fields.fittingSize)
         alert.accessoryView = fields
+        alert.layout()
+        alert.window.initialFirstResponder = apiKeyField
+        apiKeyField.nextKeyView = secretField
 
-        guard alert.runModal() == .alertFirstButtonReturn else { return false }
+        guard runModalInFront(alert) == .alertFirstButtonReturn else { return false }
         do {
             let credentials = LastFMCredentials(apiKey: apiKeyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
                                                 sharedSecret: secretField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
