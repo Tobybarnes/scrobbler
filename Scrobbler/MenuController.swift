@@ -11,7 +11,8 @@ struct AppState {
     var auth: Auth = .notAuthenticated
     var currentTrack: TrackState? = nil
     var isScrobblingEnabled: Bool = true
-    var hasAPIError: Bool = false
+    var apiErrorMessage: String? = nil
+    var musicError: String? = nil
     var recentArtists: [(artist: String, count: Int)] = []
 }
 
@@ -20,6 +21,7 @@ class MenuController {
     var onConnect: (() -> Void)?
     var onConfigureCredentials: (() -> Void)?
     var onCheckForUpdates: (() -> Void)?
+    var onOpenAutomationSettings: (() -> Void)?
     var onApproved: ((String) -> Void)?      // passes the pending token
     var onPauseResume: (() -> Void)?
     var onLove: (() -> Void)?
@@ -32,6 +34,15 @@ class MenuController {
         self.state = state
         let menu = NSMenu()
         menu.autoenablesItems = false
+
+        if let musicError = state.musicError {
+            let errorItem = NSMenuItem(title: "⚠ Can't read Apple Music", action: nil, keyEquivalent: "")
+            errorItem.isEnabled = false
+            errorItem.toolTip = musicError
+            menu.addItem(errorItem)
+            menu.addItem(makeItem("Open Automation Settings…", action: #selector(openAutomationSettingsTapped), target: self))
+            menu.addItem(NSMenuItem.separator())
+        }
 
         switch state.auth {
         case .notAuthenticated:
@@ -64,9 +75,10 @@ class MenuController {
 
     private func buildAuthenticatedMenu(_ menu: NSMenu) {
         // Error banner
-        if state.hasAPIError {
-            let errItem = NSMenuItem(title: "⚠ Last.fm unreachable", action: nil, keyEquivalent: "")
+        if let message = state.apiErrorMessage {
+            let errItem = NSMenuItem(title: "⚠ Last.fm request failed", action: nil, keyEquivalent: "")
             errItem.isEnabled = false
+            errItem.toolTip = message
             menu.addItem(errItem)
             menu.addItem(NSMenuItem.separator())
         }
@@ -87,7 +99,8 @@ class MenuController {
             trackItem.attributedTitle = menuText(trackItem.title, bold: true)
             menu.addItem(trackItem)
         } else {
-            let nothingItem = NSMenuItem(title: "Not playing", action: nil, keyEquivalent: "")
+            let title = state.musicError == nil ? "Not playing" : "Unable to read Music"
+            let nothingItem = NSMenuItem(title: title, action: nil, keyEquivalent: "")
             nothingItem.isEnabled = false
             menu.addItem(nothingItem)
         }
@@ -127,6 +140,7 @@ class MenuController {
     @objc private func connectTapped()           { onConnect?() }
     @objc private func configureCredentialsTapped() { onConfigureCredentials?() }
     @objc private func checkForUpdatesTapped() { onCheckForUpdates?() }
+    @objc private func openAutomationSettingsTapped() { onOpenAutomationSettings?() }
     @objc private func approvedTapped(_ sender: NSMenuItem) {
         onApproved?(sender.representedObject as? String ?? "")
     }

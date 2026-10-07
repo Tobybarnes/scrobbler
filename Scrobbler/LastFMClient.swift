@@ -18,6 +18,7 @@ enum LastFMError: Error, LocalizedError {
     case network(Error)
     case httpError(Int)
     case apiError(Int, String)
+    case scrobbleIgnored(String)
     case invalidResponse
 
     var errorDescription: String? {
@@ -26,6 +27,7 @@ enum LastFMError: Error, LocalizedError {
         case .network(let e): return "Network error: \(e.localizedDescription)"
         case .httpError(let code): return "HTTP error \(code)"
         case .apiError(let code, let msg): return "Last.fm error \(code): \(msg)"
+        case .scrobbleIgnored(let message): return "Last.fm did not accept this scrobble: \(message)"
         case .invalidResponse: return "Invalid response from Last.fm"
         }
     }
@@ -83,7 +85,7 @@ class LastFMClient {
     func scrobble(track: String, artist: String, album: String,
                   timestamp: Date, sessionKey: String) async throws {
         guard let credentials else { throw LastFMError.missingCredentials }
-        _ = try await post(params: [
+        let data = try await post(params: [
             "method": "track.scrobble",
             "api_key": credentials.apiKey,
             "sk": sessionKey,
@@ -92,6 +94,31 @@ class LastFMClient {
             "album[0]": album,
             "timestamp[0]": String(Int(timestamp.timeIntervalSince1970))
         ])
+        try checkScrobbleAccepted(data)
+    }
+
+    private func checkScrobbleAccepted(_ data: Data) throws {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let scrobbles = json["scrobbles"] as? [String: Any],
+              let attributes = scrobbles["@attr"] as? [String: Any],
+              let accepted = responseCount(attributes["accepted"]),
+              let ignored = responseCount(attributes["ignored"]) else {
+            throw LastFMError.invalidResponse
+        }
+        if ignored > 0 {
+            let entry = (scrobbles["scrobble"] as? [String: Any])
+                ?? (scrobbles["scrobble"] as? [[String: Any]])?.first
+            let ignoredMessage = entry?["ignoredMessage"] as? [String: Any]
+            let message = (ignoredMessage?["#text"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            throw LastFMError.scrobbleIgnored(message.isEmpty ? "The track was ignored." : message)
+        }
+        guard accepted == 1, ignored == 0 else { throw LastFMError.invalidResponse }
+    }
+
+    private func responseCount(_ value: Any?) -> Int? {
+        if let count = value as? Int { return count }
+        if let count = value as? String { return Int(count) }
+        return nil
     }
 
     func love(track: String, artist: String, sessionKey: String) async throws {
@@ -165,10 +192,12 @@ extension LastFMClient {
 
     func getToken() async throws -> String {
         guard let credentials else { throw LastFMError.missingCredentials }
-        let data = try await get(params: [
+        let params = [
             "method": "auth.getToken",
             "api_key": credentials.apiKey
-        ])
+        ]
+        let signature = Self.apiSignature(params: params, secret: credentials.sharedSecret)
+        let data = try await get(params: params.merging(["api_sig": signature]) { $1 })
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let token = json["token"] as? String else {
             throw LastFMError.invalidResponse

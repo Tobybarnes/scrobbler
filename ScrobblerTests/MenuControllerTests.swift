@@ -3,6 +3,50 @@ import XCTest
 @testable import Scrobbler
 
 final class MenuControllerTests: XCTestCase {
+    func testMusicFailureShowsRecoveryActionInsteadOfNotPlaying() throws {
+        var state = AppState()
+        state.auth = .authenticated
+        state.musicError = "Allow Scrobbler to control Music in System Settings > Privacy & Security > Automation."
+        let controller = MenuController()
+        var openedSettings = false
+        controller.onOpenAutomationSettings = { openedSettings = true }
+
+        let menu = controller.buildMenu(for: state)
+        let errorItem = try XCTUnwrap(menu.items.first { $0.toolTip == state.musicError })
+        let settingsItem = try XCTUnwrap(menu.items.first { $0.title == "Open Automation Settings…" })
+        XCTAssertFalse(errorItem.isEnabled)
+        XCTAssertFalse(menu.items.contains { $0.title == "Not playing" })
+        XCTAssertTrue(settingsItem.isEnabled)
+        let action = try XCTUnwrap(settingsItem.action)
+        XCTAssertTrue(NSApplication.shared.sendAction(action, to: settingsItem.target, from: settingsItem))
+        XCTAssertTrue(openedSettings)
+    }
+
+    func testMusicRecoveryRemovesErrorAndSettingsAction() {
+        let controller = MenuController()
+        var state = AppState()
+        state.auth = .authenticated
+        state.musicError = "Music access was denied."
+        _ = controller.buildMenu(for: state)
+
+        state.musicError = nil
+        let recoveredMenu = controller.buildMenu(for: state)
+        XCTAssertTrue(recoveredMenu.items.contains { $0.title == "Not playing" })
+        XCTAssertFalse(recoveredMenu.items.contains { $0.title == "Open Automation Settings…" })
+    }
+
+    func testLastFMErrorDescribesARequestFailureAndPreservesDetails() throws {
+        var state = AppState()
+        state.auth = .authenticated
+        state.apiErrorMessage = "Invalid session key. Please re-authenticate."
+
+        let menu = MenuController().buildMenu(for: state)
+        let errorItem = try XCTUnwrap(menu.items.first { $0.title.contains("Last.fm request failed") })
+        XCTAssertEqual(errorItem.toolTip, state.apiErrorMessage)
+        XCTAssertFalse(errorItem.isEnabled)
+        XCTAssertFalse(menu.items.contains { $0.title.contains("unreachable") })
+    }
+
     func testNowPlayingRowsUseActiveMenuAppearance() throws {
         var state = AppState()
         state.auth = .authenticated

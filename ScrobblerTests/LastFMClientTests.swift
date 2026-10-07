@@ -6,8 +6,10 @@ class MockURLSession: URLSessionProtocol {
     var responseData: Data = Data()
     var statusCode: Int = 200
     var error: Error?
+    var requests: [URLRequest] = []
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        requests.append(request)
         if let e = error { throw e }
         let response = HTTPURLResponse(
             url: request.url!,
@@ -36,6 +38,22 @@ class LastFMClientTests: XCTestCase {
         mock.responseData = #"{"token":"abc123"}"#.data(using: .utf8)!
         let token = try await client.getToken()
         XCTAssertEqual(token, "abc123")
+    }
+
+    func test_getToken_signs_the_authorization_request() async throws {
+        mock.responseData = Data(#"{"token":"abc123"}"#.utf8)
+
+        _ = try await client.getToken()
+
+        let request = try XCTUnwrap(mock.requests.first)
+        let url = try XCTUnwrap(request.url)
+        let items = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        let parameters = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value ?? "") })
+        XCTAssertEqual(parameters["method"], "auth.getToken")
+        XCTAssertEqual(parameters["api_key"], "test-api-key")
+        // Independently calculated from the documented Last.fm signing format.
+        XCTAssertEqual(parameters["api_sig"], "d1dea6f4c45a79edade0e0ca37c6333e")
+        XCTAssertNil(parameters["shared_secret"])
     }
 
     func test_getToken_throws_apiError_on_lastfm_error() async throws {
@@ -75,6 +93,38 @@ class LastFMClientTests: XCTestCase {
             timestamp: Date(timeIntervalSince1970: 1700000000),
             sessionKey: "sk123"
         )
+    }
+
+    func test_scrobble_accepts_string_response_counts() async throws {
+        mock.responseData = Data(#"{"scrobbles":{"@attr":{"accepted":"1","ignored":"0"}}}"#.utf8)
+
+        try await client.scrobble(track: "Elephant", artist: "Tame Impala", album: "Lonerism",
+                                  timestamp: Date(), sessionKey: "sk123")
+    }
+
+    func test_scrobble_throws_when_lastfm_ignores_the_track() async throws {
+        mock.responseData = Data(##"{"scrobbles":{"@attr":{"accepted":0,"ignored":1},"scrobble":{"ignoredMessage":{"code":"3","#text":"Timestamp too old"}}}}"##.utf8)
+
+        do {
+            try await client.scrobble(track: "Elephant", artist: "Tame Impala", album: "Lonerism",
+                                      timestamp: Date(), sessionKey: "sk123")
+            XCTFail("An ignored scrobble must not be reported as accepted")
+        } catch LastFMError.scrobbleIgnored(let message) {
+            XCTAssertEqual(message, "Timestamp too old")
+        }
+    }
+
+    func test_scrobble_requires_confirmation_of_acceptance() async throws {
+        for response in ["{}", "not JSON", #"{"scrobbles":{"@attr":{"accepted":0,"ignored":0}}}"#] {
+            mock.responseData = Data(response.utf8)
+            do {
+                try await client.scrobble(track: "Elephant", artist: "Tame Impala", album: "Lonerism",
+                                          timestamp: Date(), sessionKey: "sk123")
+                XCTFail("Missing confirmation must not be treated as a successful scrobble")
+            } catch LastFMError.invalidResponse {
+                // The response cannot establish that Last.fm accepted the scrobble.
+            }
+        }
     }
 
     func test_love_sends_post_request() async throws {

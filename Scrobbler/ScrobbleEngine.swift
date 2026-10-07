@@ -4,9 +4,10 @@ import Foundation
 class ScrobbleEngine {
     var isScrobblingEnabled = true
     var now: () -> Date = { Date() }
-    /// Called with the artist name each time a scrobble fires. Used by AppDelegate
-    /// to update the recent scrobbles list in the menu.
+    /// Called only after Last.fm confirms that it accepted the scrobble.
     var onScrobble: ((String) -> Void)?
+    /// Reports request failures; nil clears the error after a successful request.
+    var onError: ((Error?) -> Void)?
 
     private let client: LastFMClient
     private let sessionKey: String
@@ -17,7 +18,7 @@ class ScrobbleEngine {
     private var accumulatedSeconds: TimeInterval = 0
     private var lastUpdateDate: Date?
     private var lastPosition: TimeInterval?
-    private var hasScrobbled = false
+    private var hasSubmittedScrobble = false
 
     init(client: LastFMClient, sessionKey: String) {
         self.client = client
@@ -62,20 +63,22 @@ class ScrobbleEngine {
             currentIdentity = identity
             trackStartDate = currentDate
             accumulatedSeconds = 0
-            hasScrobbled = false
+            hasSubmittedScrobble = false
             lastUpdateDate = currentDate
             lastPosition = state.position
 
             if isScrobblingEnabled {
-                Task { [weak self] in
-                    guard let self else { return }
-                    try? await self.client.updateNowPlaying(
+                do {
+                    try await client.updateNowPlaying(
                         track: state.track,
                         artist: state.artist,
                         album: state.album,
                         duration: Int(state.duration),
-                        sessionKey: self.sessionKey
+                        sessionKey: sessionKey
                     )
+                    onError?(nil)
+                } catch {
+                    onError?(error)
                 }
             }
             return
@@ -89,21 +92,26 @@ class ScrobbleEngine {
         lastPosition = state.position
 
         // Check scrobble threshold
-        if !hasScrobbled && isScrobblingEnabled {
+        if !hasSubmittedScrobble && isScrobblingEnabled {
             let threshold = min(state.duration * 0.5, 240)
             if accumulatedSeconds >= 30 && accumulatedSeconds >= threshold,
                let startDate = trackStartDate {
-                hasScrobbled = true
-                onScrobble?(state.artist)   // notify AppDelegate for recent-scrobbles list
-                Task { [weak self] in
-                    guard let self else { return }
-                    try? await self.client.scrobble(
+                // Reserve this play before awaiting the server so overlapping polls
+                // cannot submit twice. A timeout may follow server acceptance, so
+                // surface failures without automatically resubmitting the play.
+                hasSubmittedScrobble = true
+                do {
+                    try await client.scrobble(
                         track: state.track,
                         artist: state.artist,
                         album: state.album,
                         timestamp: startDate,
-                        sessionKey: self.sessionKey
+                        sessionKey: sessionKey
                     )
+                    onError?(nil)
+                    onScrobble?(state.artist)
+                } catch {
+                    onError?(error)
                 }
             }
         }
@@ -112,7 +120,12 @@ class ScrobbleEngine {
     func loveCurrentTrack(track: String, artist: String) {
         Task { [weak self] in
             guard let self else { return }
-            try? await self.client.love(track: track, artist: artist, sessionKey: self.sessionKey)
+            do {
+                try await self.client.love(track: track, artist: artist, sessionKey: self.sessionKey)
+                self.onError?(nil)
+            } catch {
+                self.onError?(error)
+            }
         }
     }
 }

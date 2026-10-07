@@ -1,0 +1,39 @@
+Installing Scrobbler
+
+Scrobbler runs on macOS 13 or later on Apple Silicon and Intel Macs. You need
+the Music desktop app and a Last.fm account. You do not need Xcode.
+
+1. Drag Scrobbler.app onto the Applications folder in this window.
+2. Eject the Scrobbler disk image, then open Scrobbler from Applications.
+3. Look for Scrobbler in the menu bar. It has no Dock icon or main window.
+
+This release is unsigned by an identified developer and has not been
+notarized by Apple. It uses an ad-hoc signature to check the app's integrity;
+that signature does not establish who made it or mean Apple has checked it.
+macOS may block the first launch.
+
+If you trust the download, try opening Scrobbler, then open System Settings >
+Privacy & Security. Find the message about Scrobbler, click Open Anyway, and
+confirm Open. A Mac managed by your employer or school may not allow this.
+Apple's instructions are at https://support.apple.com/102445.
+
+Connecting to Last.fm
+
+This app requires your own Last.fm API key and shared secret. Sign into
+Last.fm and create an API account at https://www.last.fm/api/account/create.
+Keep the API key and shared secret shown on your API account page.
+
+1. Open Scrobbler's menu and choose "Set up Last.fm credentials...". Enter
+   your API key and shared secret. Scrobbler stores them in macOS Keychain.
+2. Choose "Connect to Last.fm" and approve access in your browser.
+3. Return to Scrobbler's menu and choose "I've approved it".
+4. When macOS asks whether Scrobbler can control Music, allow it so the app
+   can read the track you are playing. If you denied permission, open
+   System Settings > Privacy & Security > Automation and enable Music
+   under Scrobbler.
+
+Play a track in the Music desktop app. Open Scrobbler's menu to see the
+current track. It sends eligible listens to your Last.fm account.
+
+If a Last.fm request fails, the menu shows an error. This version has no
+offline queue, so it cannot recover missed listens automatically.
