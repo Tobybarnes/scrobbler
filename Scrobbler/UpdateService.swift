@@ -57,13 +57,16 @@ struct UpdateService {
     let session: URLSessionProtocol
     let appURL: URL
     let currentVersion: String
+    let fileManager: FileManager
 
     init(session: URLSessionProtocol = URLSession.shared,
          appURL: URL = Bundle.main.bundleURL,
-         currentVersion: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0") {
+         currentVersion: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0",
+         fileManager: FileManager = .default) {
         self.session = session
         self.appURL = appURL
         self.currentVersion = currentVersion
+        self.fileManager = fileManager
     }
 
     var releasesURL: URL {
@@ -83,7 +86,10 @@ struct UpdateService {
               !tagName.isEmpty else {
             throw UpdateError.invalidResponse
         }
-        let downloadBase = "https://github.com/\(Self.owner)/\(Self.repository)/releases/latest/download"
+        guard let releaseVersion = Self.version(from: tagName) else {
+            throw UpdateError.invalidVersion(tagName)
+        }
+        let downloadBase = "https://github.com/\(Self.owner)/\(Self.repository)/releases/download/\(tagName)"
         let release = GitHubRelease(
             tagName: tagName,
             name: tagName.lowercased().hasPrefix("v") ? String(tagName.dropFirst()) : tagName,
@@ -99,15 +105,18 @@ struct UpdateService {
                 )
             ]
         )
-        guard let releaseVersion = Self.version(from: release.tagName) else {
-            throw UpdateError.invalidVersion(release.tagName)
-        }
-
         let installedVersion = Self.version(from: currentVersion) ?? []
         return Self.isNewer(releaseVersion, than: installedVersion) ? release : nil
     }
 
     func install(_ release: GitHubRelease) async throws {
+        let installationDirectory = appURL.deletingLastPathComponent()
+        let volumeIsReadOnly = try? installationDirectory.resourceValues(forKeys: [.volumeIsReadOnlyKey]).volumeIsReadOnly
+        guard fileManager.isWritableFile(atPath: installationDirectory.path), volumeIsReadOnly != true else {
+            throw UpdateError.installationFailed(
+                "Move Scrobbler to your Applications folder and reopen it there before updating. The current location is read-only."
+            )
+        }
         guard let appAsset = release.assets.first(where: { $0.name == Self.appAssetName }) else {
             throw UpdateError.noReleaseAsset(Self.appAssetName)
         }
@@ -147,7 +156,7 @@ struct UpdateService {
         try replaceInstalledApplication(with: extractedApp)
     }
 
-    private func validateApplication(at url: URL, expectedVersion: String) throws {
+    func validateApplication(at url: URL, expectedVersion: String) throws {
         guard FileManager.default.fileExists(atPath: url.appendingPathComponent("Contents/MacOS/Scrobbler").path),
               let bundle = Bundle(url: url),
               bundle.bundleIdentifier == "com.tobybarnes.scrobbler",
@@ -155,22 +164,46 @@ struct UpdateService {
               Self.version(from: version) == Self.version(from: expectedVersion) else {
             throw UpdateError.invalidApplication
         }
+
+        // Ad-hoc signatures provide integrity checking even without Developer ID.
+        let codesign = Process()
+        codesign.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        codesign.arguments = ["--verify", "--deep", "--strict", url.path]
+        codesign.standardOutput = FileHandle.nullDevice
+        codesign.standardError = FileHandle.nullDevice
+        try codesign.run()
+        codesign.waitUntilExit()
+        guard codesign.terminationStatus == 0 else { throw UpdateError.invalidApplication }
     }
 
-    private func replaceInstalledApplication(with newApp: URL) throws {
-        let fileManager = FileManager.default
+    func replaceInstalledApplication(with newApp: URL) throws {
         let backupURL = appURL.deletingLastPathComponent()
             .appendingPathComponent(".Scrobbler-old-\(UUID().uuidString).app")
 
         do {
             try fileManager.moveItem(at: appURL, to: backupURL)
-            try fileManager.moveItem(at: newApp, to: appURL)
-            try? fileManager.removeItem(at: backupURL)
         } catch {
-            try? fileManager.removeItem(at: appURL)
-            try? fileManager.moveItem(at: backupURL, to: appURL)
+            // The installed app is still in place; never remove it on this path.
             throw UpdateError.installationFailed(error.localizedDescription)
         }
+
+        do {
+            try fileManager.moveItem(at: newApp, to: appURL)
+        } catch {
+            let installationError = error
+            do {
+                if fileManager.fileExists(atPath: appURL.path) {
+                    try fileManager.removeItem(at: appURL)
+                }
+                try fileManager.moveItem(at: backupURL, to: appURL)
+            } catch {
+                throw UpdateError.installationFailed(
+                    "The original app is preserved at \(backupURL.path). Move it back to \(appURL.path) before reopening Scrobbler. \(error.localizedDescription)"
+                )
+            }
+            throw UpdateError.installationFailed(installationError.localizedDescription)
+        }
+        try? fileManager.removeItem(at: backupURL)
     }
 
     private func runDitto(arguments: [String]) throws {

@@ -26,24 +26,55 @@ jobs:
           RELEASE_VERSION: ${{ github.ref_name }}
         run: |
           RELEASE_VERSION="${RELEASE_VERSION#v}"
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Expected a vMAJOR.MINOR.PATCH tag" >&2; exit 1; }
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $RELEASE_VERSION" Scrobbler/Info.plist
 
-      - name: Build app
+      - name: Run tests
+        run: |
+          xcodebuild test \
+            -scheme Scrobbler \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/TestDerivedData \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
+
+      - name: Build universal app
         run: |
           xcodebuild build \
             -scheme Scrobbler \
             -configuration Release \
             -destination 'platform=macOS' \
-            -derivedDataPath build/DerivedData
+            -derivedDataPath build/ReleaseDerivedData \
+            ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
 
       - name: Package app
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
         run: |
-          ditto -c -k --sequesterRsrc --keepParent \
-            build/DerivedData/Build/Products/Release/Scrobbler.app \
-            Scrobbler.zip
-          shasum -a 256 Scrobbler.zip > Scrobbler.zip.sha256
+          scripts/package-release.sh \
+            build/ReleaseDerivedData/Build/Products/Release/Scrobbler.app \
+            build/release "${RELEASE_VERSION#v}"
+
+      - name: Write installation notes
+        run: |
+          cat > build/release/RELEASE_NOTES.md <<'NOTES'
+          Download **Scrobbler.dmg**, open it, and drag Scrobbler into Applications. It runs on macOS 13 or later on Apple Silicon and Intel Macs. You do not need Xcode.
+
+          This release is **unsigned by an identified developer and is not notarized by Apple**. It uses an ad-hoc signature for bundle integrity. macOS may block the first launch. If you trust this download, try opening the app, then go to System Settings > Privacy & Security > Open Anyway and confirm Open. Managed Macs may not allow this exception. [Apple explains this process](https://support.apple.com/102445).
+
+          On first launch, enter your own Last.fm API key and shared secret from [Last.fm's API account page](https://www.last.fm/api/account/create), then connect and authorize your Last.fm account. Allow Scrobbler to control Music when macOS asks. The app runs in the menu bar and has no Dock icon. Full instructions are in INSTALL.txt inside the DMG.
+
+          Scrobbler.zip and its SHA-256 checksum remain available for the built-in updater. A SHA-256 checksum is also provided for the DMG.
+          NOTES
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" Scrobbler.zip Scrobbler.zip.sha256 --generate-notes
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            build/release/Scrobbler.dmg \
+            build/release/Scrobbler.dmg.sha256 \
+            build/release/Scrobbler.zip \
+            build/release/Scrobbler.zip.sha256 \
+            --verify-tag --notes-file build/release/RELEASE_NOTES.md --generate-notes

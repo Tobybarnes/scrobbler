@@ -41,4 +41,55 @@ class MusicPollerParserTests: XCTestCase {
     func test_parse_malformed_output_returns_nil() {
         XCTAssertNil(MusicPoller.parseOutput("something\nwrong"))
     }
+
+    func testDeniedAutomationReportsRecoveryInstructionsOnMainThread() {
+        let reported = expectation(description: "Automation denial is reported")
+        let poller = MusicPoller(interval: 3600) { _ in
+            throw NSError(domain: "NSAppleScriptError", code: -1743, userInfo: [
+                NSAppleScript.errorNumber: -1743,
+                NSLocalizedDescriptionKey: "Not authorized to send Apple events to Music."
+            ])
+        }
+        defer { poller.stop(); poller.onError = nil }
+        poller.onError = { error in
+            XCTAssertTrue(Thread.isMainThread)
+            XCTAssertNotNil(error)
+            XCTAssertTrue(error?.localizedDescription.contains("Privacy & Security > Automation") == true)
+            XCTAssertTrue(error?.localizedDescription.contains("Music") == true)
+            reported.fulfill()
+        }
+
+        poller.start()
+        wait(for: [reported], timeout: 2)
+    }
+
+    func testSuccessfulPollClearsAnEarlierScriptError() {
+        let failed = expectation(description: "First poll reports the script failure")
+        let recovered = expectation(description: "Next successful poll clears the error")
+        var attempt = 0
+        let poller = MusicPoller(interval: 3600) { _ in
+            attempt += 1
+            if attempt == 1 {
+                throw NSError(domain: "NSAppleScriptError", code: -600, userInfo: [
+                    NSLocalizedDescriptionKey: "Application isn't running."
+                ])
+            }
+            return "not_running"
+        }
+        defer { poller.stop(); poller.onError = nil }
+        poller.onError = { error in
+            XCTAssertTrue(Thread.isMainThread)
+            poller.stop()
+            if let error {
+                XCTAssertTrue(error.localizedDescription.contains("Application isn't running."))
+                failed.fulfill()
+                poller.start()
+            } else {
+                recovered.fulfill()
+            }
+        }
+
+        poller.start()
+        wait(for: [failed, recovered], timeout: 2, enforceOrder: true)
+    }
 }

@@ -30,6 +30,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // The hosted unit tests must not read the user's session or scrobble music.
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil,
+              NSClassFromString("XCTestCase") == nil else { return }
         installMainMenu()
         setupStatusItem()
         setupMenuCallbacks()
@@ -141,6 +144,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         engine.onScrobble = { [weak self] artist in
             self?.recordScrobble(artist: artist)
         }
+        engine.onError = { [weak self] error in
+            self?.appState.apiErrorMessage = error?.localizedDescription
+        }
+        poller.onError = { [weak self] error in
+            self?.appState.musicError = error?.localizedDescription
+        }
         scrobbleEngine = engine
 
         poller.publisher
@@ -173,6 +182,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menuController.onCheckForUpdates = { [weak self] in
             Task { @MainActor [weak self] in
                 await self?.checkForUpdates()
+            }
+        }
+
+        menuController.onOpenAutomationSettings = {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
+                NSWorkspace.shared.open(url)
             }
         }
 
@@ -225,7 +240,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let sessionKey = try await lastFMClient.getSession(token: token)
             try sessionStore.save(sessionKey)
             appState.auth = .authenticated
-            appState.hasAPIError = false
+            appState.apiErrorMessage = nil
             startPolling(sessionKey: sessionKey)
         } catch LastFMError.apiError(14, _) {
             showAlert(
@@ -283,13 +298,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             let confirmation = NSAlert()
             confirmation.messageText = "Scrobbler update available"
-            confirmation.informativeText = "Install \(release.name) from GitHub? The app will restart when the update is installed."
+            confirmation.informativeText = "Install \(release.name) from GitHub? After the update, quit and reopen Scrobbler to use the new version."
             confirmation.addButton(withTitle: "Install Update")
             confirmation.addButton(withTitle: "Later")
             guard runModalInFront(confirmation) == .alertFirstButtonReturn else { return }
 
             try await updateService.install(release)
-            NSWorkspace.shared.open(Bundle.main.bundleURL)
+            showAlert("Update installed", message: "Scrobbler will now quit. Reopen it from your Applications folder to use the new version.")
             NSApplication.shared.terminate(nil)
         } catch {
             showAlert("Update failed", message: error.localizedDescription)
@@ -300,9 +315,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func configureCredentials() -> Bool {
         let alert = NSAlert()
         alert.messageText = "Last.fm credentials"
-        alert.informativeText = "Enter your Last.fm API key and shared secret. They are stored only in this Mac’s Keychain."
+        alert.informativeText = "This app needs an API key and shared secret from your Last.fm API account. These are different from your Last.fm password and are stored only in this Mac’s Keychain."
         alert.addButton(withTitle: "Save")
         alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Get an API key…")
 
         let apiKeyLabel = NSTextField(labelWithString: "API key")
         let apiKeyField = NSTextField(string: lastFMClient.credentials?.apiKey ?? "")
@@ -332,7 +348,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.window.initialFirstResponder = apiKeyField
         apiKeyField.nextKeyView = secretField
 
-        guard runModalInFront(alert) == .alertFirstButtonReturn else { return false }
+        let response = runModalInFront(alert)
+        if response == .alertThirdButtonReturn {
+            NSWorkspace.shared.open(URL(string: "https://www.last.fm/api/account/create")!)
+            return false
+        }
+        guard response == .alertFirstButtonReturn else { return false }
         do {
             let credentials = LastFMCredentials(apiKey: apiKeyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
                                                 sharedSecret: secretField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))

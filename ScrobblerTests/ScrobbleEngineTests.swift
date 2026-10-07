@@ -8,19 +8,31 @@ class MockLastFMClient: LastFMClient {
     var updateNowPlayingCalls: [(track: String, artist: String)] = []
     var scrobbleCalls: [(track: String, artist: String)] = []
     var loveCalls: [(track: String, artist: String)] = []
+    var nowPlayingError: Error?
+    var scrobbleError: Error?
+    var loveError: Error?
+    var scrobbleOperation: (() async throws -> Void)?
+
+    init() {
+        super.init(credentials: LastFMCredentials(apiKey: "test-api-key", sharedSecret: "test-secret"))
+    }
 
     override func updateNowPlaying(track: String, artist: String, album: String,
                                    duration: Int, sessionKey: String) async throws {
         updateNowPlayingCalls.append((track, artist))
+        if let nowPlayingError { throw nowPlayingError }
     }
 
     override func scrobble(track: String, artist: String, album: String,
                            timestamp: Date, sessionKey: String) async throws {
         scrobbleCalls.append((track, artist))
+        if let scrobbleOperation { try await scrobbleOperation() }
+        if let scrobbleError { throw scrobbleError }
     }
 
     override func love(track: String, artist: String, sessionKey: String) async throws {
         loveCalls.append((track, artist))
+        if let loveError { throw loveError }
     }
 }
 
@@ -90,6 +102,88 @@ class ScrobbleEngineTests: XCTestCase {
         await engine.update(makePlaying(track: "Short Track", position: 36, duration: 60))
         await Task.yield()
         XCTAssertEqual(mockClient.scrobbleCalls.count, 1)
+    }
+
+    func test_failed_scrobble_reports_error_without_success_or_automatic_retry() async {
+        let failed = expectation(description: "Failed scrobble is visible")
+        var recordedArtists: [String] = []
+        engine.onScrobble = { recordedArtists.append($0) }
+        engine.onError = { error in
+            if let error = error as? URLError {
+                XCTAssertEqual(error.code, .timedOut)
+                failed.fulfill()
+            }
+        }
+        mockClient.scrobbleError = URLError(.timedOut)
+
+        await engine.update(makePlaying(track: "Short Track", position: 0, duration: 60))
+        advanceTime(by: 30)
+        await engine.update(makePlaying(track: "Short Track", position: 30, duration: 60))
+        await fulfillment(of: [failed], timeout: 1)
+        advanceTime(by: 5)
+        await engine.update(makePlaying(track: "Short Track", position: 35, duration: 60))
+
+        XCTAssertTrue(recordedArtists.isEmpty)
+        XCTAssertEqual(mockClient.scrobbleCalls.count, 1, "A timeout may follow server acceptance, so do not resubmit automatically")
+    }
+
+    func test_pending_scrobble_reports_success_only_after_acceptance_and_only_once() async {
+        let submitted = expectation(description: "Submission started")
+        let accepted = expectation(description: "Server accepted the scrobble")
+        var pending: CheckedContinuation<Void, Never>?
+        var recordedArtists: [String] = []
+        mockClient.scrobbleOperation = {
+            await withCheckedContinuation { continuation in
+                pending = continuation
+                submitted.fulfill()
+            }
+        }
+        engine.onScrobble = { artist in
+            recordedArtists.append(artist)
+            accepted.fulfill()
+        }
+
+        await engine.update(makePlaying(track: "Short Track", position: 0, duration: 60))
+        advanceTime(by: 30)
+        let submission = Task {
+            await engine.update(makePlaying(track: "Short Track", position: 30, duration: 60))
+        }
+        await fulfillment(of: [submitted], timeout: 1)
+        XCTAssertTrue(recordedArtists.isEmpty)
+        advanceTime(by: 5)
+        await engine.update(makePlaying(track: "Short Track", position: 35, duration: 60))
+        XCTAssertEqual(mockClient.scrobbleCalls.count, 1)
+
+        pending?.resume()
+        await submission.value
+        await fulfillment(of: [accepted], timeout: 1)
+        XCTAssertEqual(recordedArtists, ["Artist"])
+    }
+
+    func test_now_playing_failure_is_cleared_after_a_successful_request() async {
+        let failed = expectation(description: "Now Playing failure is visible")
+        let recovered = expectation(description: "Successful request clears the error")
+        engine.onError = { error in
+            if error != nil { failed.fulfill() } else { recovered.fulfill() }
+        }
+        mockClient.nowPlayingError = URLError(.notConnectedToInternet)
+
+        await engine.update(makePlaying(track: "Track A", position: 0))
+        await fulfillment(of: [failed], timeout: 1)
+        mockClient.nowPlayingError = nil
+        await engine.update(makePlaying(track: "Track B", position: 0))
+        await fulfillment(of: [recovered], timeout: 1)
+    }
+
+    func test_love_failure_is_reported() async {
+        let failed = expectation(description: "Love failure is visible")
+        mockClient.loveError = URLError(.notConnectedToInternet)
+        engine.onError = { error in
+            if error != nil { failed.fulfill() }
+        }
+
+        engine.loveCurrentTrack(track: "Elephant", artist: "Tame Impala")
+        await fulfillment(of: [failed], timeout: 1)
     }
 
     func test_long_track_scrobbles_at_4_minutes() async {

@@ -3,24 +3,34 @@ import Combine
 
 class MusicPoller {
     let publisher = PassthroughSubject<TrackState?, Never>()
+    var onError: ((Error?) -> Void)?
 
     private var timer: Timer?
     private let interval: TimeInterval
-    private let scriptRunner: (String) -> String?
+    private let scriptRunner: (String) throws -> String?
 
-    // Production init — uses real osascript
+    // Production init — executes AppleScript to read Music
     convenience init(interval: TimeInterval = 5.0) {
         self.init(interval: interval) { script in
             var error: NSDictionary?
-            let appleScript = NSAppleScript(source: script)
-            let result = appleScript?.executeAndReturnError(&error)
-            if error != nil { return nil }
-            return result?.stringValue
+            guard let appleScript = NSAppleScript(source: script) else {
+                throw NSError(domain: "Scrobbler.AppleScript", code: -1, userInfo: [
+                    NSLocalizedDescriptionKey: "The Music script could not be created."
+                ])
+            }
+            let result = appleScript.executeAndReturnError(&error)
+            if let error {
+                throw NSError(domain: "Scrobbler.AppleScript",
+                              code: error[NSAppleScript.errorNumber] as? Int ?? -1,
+                              userInfo: [NSLocalizedDescriptionKey:
+                                error[NSAppleScript.errorMessage] as? String ?? "The Music script failed."])
+            }
+            return result.stringValue
         }
     }
 
     // Testable init — injectable script runner
-    init(interval: TimeInterval = 5.0, scriptRunner: @escaping (String) -> String?) {
+    init(interval: TimeInterval = 5.0, scriptRunner: @escaping (String) throws -> String?) {
         self.interval = interval
         self.scriptRunner = scriptRunner
     }
@@ -40,15 +50,42 @@ class MusicPoller {
     private func poll() {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
-            let output = self.scriptRunner(Self.appleScript)
-            let state = output.flatMap { Self.parseOutput($0) }
-            DispatchQueue.main.async {
-                self.publisher.send(state)
+            do {
+                let output = try self.scriptRunner(Self.appleScript)
+                let state = output.flatMap { Self.parseOutput($0) }
+                DispatchQueue.main.async {
+                    self.onError?(nil)
+                    self.publisher.send(state)
+                }
+            } catch {
+                let scriptError = error as NSError
+                let number = scriptError.userInfo[NSAppleScript.errorNumber] as? Int ?? scriptError.code
+                let reportedError: PollingError = number == -1743
+                    ? .automationPermissionDenied
+                    : .scriptFailed(error.localizedDescription)
+                DispatchQueue.main.async {
+                    self.onError?(reportedError)
+                    self.publisher.send(nil)
+                }
             }
         }
     }
 
     // MARK: - Helpers
+
+    private enum PollingError: LocalizedError {
+        case automationPermissionDenied
+        case scriptFailed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .automationPermissionDenied:
+                return "Allow Scrobbler to control Music in System Settings > Privacy & Security > Automation."
+            case .scriptFailed(let message):
+                return "Couldn't read Apple Music: \(message)"
+            }
+        }
+    }
 
     private static func parseDouble(_ string: String) -> Double? {
         // AppleScript may return a comma decimal separator on non-English locales.
