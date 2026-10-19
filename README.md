@@ -1,98 +1,33 @@
 # Scrobbler
 
-A small macOS menu bar app that watches Apple Music and scrobbles what you're
-listening to back to Last.fm. It's a personal tool, written for myself, no
-multi-account support, no settings screen, no telemetry.
-
-## What it does
-
-Sits in the menu bar, polls Apple Music every five seconds, and sends
-`updateNowPlaying` and `scrobble` calls to Last.fm using the standard rules:
-a track scrobbles once it has played for at least 30 seconds and either past
-the halfway mark or four minutes, whichever lands first. You can pause
-scrobbling, love the current track, and disconnect from the dropdown.
-
-The menu bar title shows the current track and a coloured dot for status.
-Green when scrobbling is live, grey when paused, amber when something is
-wrong with auth or the API.
+A macOS menubar app that scrobbles your currently playing music to Last.fm.
 
 ## Requirements
 
-* macOS 13 or later
-* Apple Music (the desktop app, not just the web player)
-* A Last.fm account
-* Xcode 15 with Swift 5.9
-* [XcodeGen](https://github.com/yonaskolb/XcodeGen) to generate the project from `project.yml`
+- macOS 13+
+- Xcode 15+
+- A Last.fm account with an API application
 
-## Build and run
+## Building
 
-Clone the repo, generate the Xcode project, then open it:
+1. Clone the repo
+2. Open `Scrobbler.xcodeproj` in Xcode
+3. Build and run (⌘R)
 
-```bash
-xcodegen generate
-open Scrobbler.xcodeproj
-```
+## Setup
 
-Last.fm credentials are entered on first launch and stored in the macOS
-Keychain. They are never included in the repository. A fresh clone can be
-configured on any Mac by choosing “Set up Last.fm credentials…”.
+On first launch, the app will prompt you for your Last.fm API credentials.
 
-Build the `Scrobbler` scheme. The app launches with no Dock icon, just a
-menu bar entry.
+To get them:
+1. Go to [last.fm/api/account/create](https://www.last.fm/api/account/create)
+2. Create a new application (name it anything)
+3. Copy the **API key** and **Shared secret** — the secret is only shown once, so save it somewhere safe (e.g. your password manager)
+4. Paste both into the app's setup dialog
 
-## First run
+Credentials are stored in your Mac's Keychain and never leave your machine.
 
-The first time you launch, the menu reads "Not connected". Click "Connect to
-Last.fm" and the app opens the Last.fm authorisation page in your browser.
-Approve the request there, come back to the menu, and click "I've approved
-it". The session key gets stored in your macOS Keychain and the app stays
-authenticated until you click "Disconnect from Last.fm".
+## How it works
 
-## Architecture
-
-Five files, one job each.
-
-* `MusicPoller` runs a five-second timer, queries Music.app via AppleScript,
-  publishes a `TrackState` through Combine
-* `ScrobbleEngine` consumes `TrackState`, accumulates playback time, fires
-  the scrobble when the threshold is met
-* `LastFMClient` handles the signed HTTP calls (`auth.getToken`,
-  `auth.getSession`, `track.updateNowPlaying`, `track.scrobble`, `track.love`)
-* `SessionStore` reads and writes the session key to the Keychain
-* `AppDelegate` wires everything together and owns the `NSStatusItem`
-* `CredentialStore` keeps the Last.fm API key and shared secret in Keychain
-
-`MenuController` builds the menu from an `AppState` value. The UI never
-drives logic, it only reflects state.
-
-## Tests
-
-The poller and engine are unit tested. Run from Xcode with `Cmd+U` or via
-the command line:
-
-```bash
-xcodebuild test -scheme Scrobbler -destination "platform=macOS"
-```
-
-## Known limitations
-
-Scrubbing backwards on a track resets the accumulated time, so manually
-seeking back more than two seconds will look like a replay to the engine.
-Acceptable trade off for a personal tool. Pausing scrobbling discards
-accumulated time on the current track too, rather than trying to do partial
-play accounting.
-
-The checked-in project uses local/ad-hoc signing for easy rebuilds from source.
-That is fine when running from Xcode. A standalone `.app` copied between Macs
-will still run into Gatekeeper/Santa policy unless it is built locally on that
-Mac or signed/notarized with a Developer ID.
-
-## Why this exists
-
-Last.fm has a Mac client called Last.app, but it crashes for me regularly
-and the project hasn't seen a release in a long time. I wanted something
-small and reliable that I could read in an afternoon.
-
-## Licence
-
-MIT.
+- Polls the currently playing track every 10 seconds via AppleScript
+- Scrobbles a track after it has played for 50% of its duration (or 4 minutes, whichever is less), per Last.fm's scrobbling rules
+- Runs as a menubar app with no Dock icon
